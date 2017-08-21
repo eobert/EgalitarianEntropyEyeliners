@@ -1,0 +1,180 @@
+component = require("component")
+sides = require("sides")
+event = require("event")
+colors = require("colors")
+term = require("term")
+
+counts = {}
+locations = {}
+
+debug = false
+noCraft = false
+
+itemList  = { {"Water Bucket", "minecraft:water_bucket", 0},
+              {"Seeds", "minecraft:wheat_seeds", 0},
+              {"Rune of Air", "botania:rune", 3},
+              {"Rune of Autumn", "botania:rune", 6},
+              {"Rune of Earth", "botania:rune", 2},
+              {"Rune of Fire", "botania:rune", 1},
+              {"Rune of Spring", "botania:rune", 4},
+              {"Rune of Summer", "botania:rune", 5},
+              {"Rune of Water", "botania:rune", 0},
+              {"Rune of Winter", "botania:rune",7},
+              {"Mystical White Petal","botania:petal",0},
+              {"Mystical Orange Petal","botania:petal",1},
+              {"Mystical Magenta Petal","botania:petal",2},
+              {"Mystical Light Blue Petal","botania:petal",3},
+              {"Mystical Yellow Petal","botania:petal",4},
+              {"Mystical Lime Petal","botania:petal",5},
+              {"Mystical Pink Petal","botania:petal",6},
+              {"Mystical Gray Petal","botania:petal",7},
+              {"Mystical Light Gray Petal","botania:petal",8},
+              {"Mystical Cyan Petal","botania:petal",9},
+              {"Mystical Purple Petal","botania:petal",10},
+              {"Mystical Blue Petal","botania:petal",11},
+              {"Mystical Brown Petal","botania:petal",12},
+              {"Mystical Green Petal","botania:petal",13},
+              {"Mystical Red Petal","botania:petal",14},
+              {"Mystical Black Petal","botania:petal",15},
+              {"Redstone Root","botania:manaResource",6},
+}
+
+recipeList = { Gourmaryllis = { {"Mystical Light Gray Petal",2}, {"Mystical Yellow Petal",2}, {"Mystical Red Petal",1}, {"Rune of Summer",1}, {"Rune of Fire",1} },
+               Endoflame = { {"Mystical Brown Petal",2}, {"Mystical Red Petal",1}, {"Mystical Light Gray Petal",1} },
+               Solegnolia = { {"Mystical Brown Petal",2}, {"Mystical Red Petal",1}, {"Mystical Blue Petal",1}, {"Redstone Root",1} },
+}
+     
+function validItem (name, damage)
+  for label,info in pairs(itemList) do
+    l = info[1]
+    n = info[2]
+    d = info[3]
+    if (name == n and damage == d) then
+       return true
+    end
+  end
+  return false 
+end
+       
+function findComponents()
+  local ts, pts, prs
+  for k,v in component.list("transposer") do
+    ts = k
+  end
+  pts = component.proxy(ts)
+  for k,v in component.list("redstone") do
+    ts = k
+  end
+  prs = component.proxy(ts)
+  return pts, prs
+end
+
+function findInventories(pts)
+  local retPhantomFace = -1
+  local retChest = -1
+  local size
+
+  for i = 0,5 do
+    size = pts.getInventorySize(i)
+    if (size == 1) then
+      retPhantomFace = i
+    elseif (size == 27) then
+      retChest = i
+    end
+  end
+
+  if retPhantomFace == -1 or retChest == -1 then
+    print("Could not find inventories")
+    os.exit()
+  end
+
+  return retPhantomFace, retChest
+end
+
+function readChest(pts,side)
+  counts = {}
+  locations = {}
+
+  term.clear()
+  print("Petal Apothecary automation program")
+
+  for slot = 1,27 do
+    stackInfo = pts.getStackInSlot(side,slot)
+    if stackInfo then
+      if debug then
+        for k,v in pairs(stackInfo) do
+          print("[" .. slot .. "] " .. k .. ": " .. tostring(v))
+        end
+      end
+      local label = stackInfo["label"]
+      if (counts[label] ~= nil) then
+        print("Combing stacks at " .. locations[label] .. " and " .. slot)
+        pts.transferItem(sides.left, sides.left, stackInfo["size"], slot, locations[label])
+      else
+        counts[label] = stackInfo["size"]
+        locations[label] = slot  
+      end
+    end
+  end
+
+
+  checkRecipes()
+  os.sleep(5)
+end
+
+function checkRecipes() 
+  for k,v in pairs(recipeList) do
+    hasIngredients = 0
+    neededItems = 0
+    if (counts["Water Bucket"] ~= nil and counts["Water Bucket"] > 0 and
+        counts["Seeds"] ~= nil and counts["Seeds"] > 0) then
+      for c,i in pairs(v) do
+        label = i[1]
+        qty = i[2]
+        if debug then print("Need " .. qty .. "x " .. label .. " for " .. k) end
+        neededItems = neededItems + 1
+        if (counts[label] ~= nil and counts[label] >= qty) then
+          if debug then
+            print("Found " .. qty .. "x " .. label .. " for " .. k)
+          end
+          hasIngredients = hasIngredients + 1
+        end
+      end
+      if (hasIngredients == neededItems) then
+        print("Found ingredients for " .. k)
+        executeCraft(k)
+        return
+      end
+    end
+  end
+end
+
+function executeCraft(recipe)
+
+  if noCraft  then return   end
+  prs.setOutput(sides.back, 15)
+  print("Crafting " .. recipe)
+  pts.transferItem(Chest, PhantomFace, 1, locations["Water Bucket"], 1)
+  for k,i in pairs(recipeList[recipe]) do
+     item = i[1]
+     qty = i[2]
+     slot = locations[item]
+     print("Adding " .. qty .. " of " .. item .. " from slot " .. slot)
+     pts.transferItem(Chest, PhantomFace, qty,slot,1)
+     os.sleep(0.2)
+  end
+  os.sleep(2)
+  
+  pts.transferItem(Chest, PhantomFace, 1, locations["Seeds"], 1)
+  prs.setOutput(sides.back,0)
+  os.sleep(5)
+  print("Crafting of " .. recipe .. " completed.")
+end
+
+pts, prs = findComponents()
+PhantomFace,Chest = findInventories(pts)
+print("Found PhantomFace on " .. sides[PhantomFace] .. " side")
+print("Found chest on " .. sides[Chest] .. " side")
+while true do
+  readChest(pts,Chest)
+end

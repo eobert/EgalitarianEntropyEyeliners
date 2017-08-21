@@ -1,0 +1,81 @@
+local component = require("component")
+local sides = require("sides")
+local colors = require("colors")
+
+itemList = { Soul_Sand = { "minecraft:soul_sand", 88, 0 },
+             Wither_Skeleton_Skull = { "minecraft:Skull", 1 },
+             Small_Tiles = { "chisel:cobblestone", 8, 0 },
+}
+
+sand1TS = component.proxy("71ec5ee7-934a-4c07-beea-acfe63ce417b")
+sand2TS = component.proxy("57643317-826a-4aa1-88a7-d33a13a81df8")
+skullTS = component.proxy("a7e08c53-657b-4d7d-b5cb-abd74ce59b9c")
+
+prs = component.getPrimary("redstone")
+
+debug = false
+function readChest ()
+  counts = {}
+  locations = {}
+  for slot = 1,27 do 
+    stackInfo = skullTS.getStackInSlot(sides.right,slot)
+    if stackInfo then
+      if debug then 
+        for k,v in pairs(stackInfo) do
+          print("[" .. slot .. "] " .. k .. ": " .. tostring(v))
+        end
+      end
+      local label = stackInfo["label"]
+      if (counts[label] ~= nil) then
+        print("Combing stacks at " .. locations[label] .. " and " .. slot)
+        skullTS.transferItem(sides.right, sides.right, stackInfo["size"], slot, locations[label])
+        counts[label] = skullTS.getSlotStackSize(sides.right,locations[label])
+      else 
+        counts[label] = stackInfo["size"]
+        locations[label] = slot
+      end
+    end
+  end
+  checkRecipes()
+end
+
+function checkRecipes ()
+  skull = "Wither Skeleton Skull"
+  if (counts[skull] == nil or counts[skull] < 3) then
+    return
+  end
+  soulsand = "Soul Sand"
+  if (counts[soulsand] == nil or counts[soulsand] < 4) then
+    return
+  end
+  print("Found ingredients to spawn a wither!")
+
+  sand1TS.transferItem(sides.left,sides.top,1,locations[soulsand],1)
+  sand1TS.transferItem(sides.left,sides.right,1,locations[soulsand],1)
+  sand2TS.transferItem(sides.top,sides.right,1,locations[soulsand],1)
+  sand2TS.transferItem(sides.top,sides.bottom,1,locations[soulsand],1)
+
+  skullTS.transferItem(sides.right,sides.top,1,locations[skull],1)
+  skullTS.transferItem(sides.right,sides.left,1,locations[skull],1)
+  skullTS.transferItem(sides.right,sides.bottom,1,locations[skull],1)
+
+  prs.setBundledOutput(sides.top,colors.brown,15)
+  os.sleep(0.5)
+  prs.setBundledOutput(sides.top,colors.brown,0)
+  os.sleep(2)
+  prs.setBundledOutput(sides.top,colors.black,15)
+  os.sleep(0.5)
+  prs.setBundledOutput(sides.top,colors.black,0)
+
+
+  os.sleep(30)
+
+  for i=1,5 do 
+    component.computer.beep(1000,0.25)
+  end
+end
+
+while true do 
+  readChest()
+  os.sleep(5)
+end
