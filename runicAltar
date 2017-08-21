@@ -1,9 +1,25 @@
+-- [[
+Name: runicAltar
+Description: This program will monitor a connected inventory for items.  If it sees items in the inventory that 
+can be used in a valid runic altar recipe, it will move those items to a connected dropper.  The program will 
+then monitor the status of the runic altar, and when the crafting is complete, it will drop a livingrock and
+right-click the altar with a Wand of the Forest
+Requirements: This setup assumes a transposer with a chest and an open crate adjacent to it.  In my particular case, 
+I bound a phantomface from Actually Additions to the open crate so that I could hide the setup better.
+The setup also assumes a redstone i/o connected to the computer.  The redstone i/o should be adjacent to the runic 
+altar so that it can read the state of the altar.  It should also be connected either directly or indirectly to
+a dispenser.  The dispenser must be next to and pointing at the altar, and it needs a Wand of the Forest in it.
+See attached screenshot.
+--]]
+
+-- Require various libaries for this machine. 
 component = require("component")
 sides = require("sides")
 event = require("event")
 colors = require("colors")
 term = require("term")
 
+-- Declare some empty lists that will be populated dynamically later.
 counts = {}
 locations = {}
 
