@@ -1,0 +1,205 @@
+component = require("component")
+sides = require("sides")
+event = require("event")
+colors = require("colors")
+term = require("term")
+
+counts = {}
+locations = {}
+
+debug = false
+
+itemList  = { { "Block of Coal", "minecraft:coal_block", 0 },
+              { "Bone Meal", "minecraft:dye", 15},
+              { "Cake", "minecraft:cake", 0},
+              { "Carpet", "minecraft:carpet", 0},
+              { "Feather", "minecraft:feather", 0},
+              { "Fishing Rod", "minecraft:fishing_rod", 0},
+              { "Gunpowder", "minecraft:gunpowder", 0},
+              { "Livingrock", "botania:livingrock", 0},
+              { "Mana Diamond", "botania:manaResource", 2},
+              { "Mana Pearl", "botania:manaResource", 1},
+              { "Mana Powder", "botania:manaResource", 23},
+              { "Manasteel Ingot", "botania:manaResource", 0},
+              { "Melon", "minecraft:melon", 0},
+              { "Mushroom", "minecraft:brown_mushroom", 0},
+              { "Nether Brick", "minecraft:netherbrick", 0},
+              { "Nether Wart", "minecraft:nether_wart", 0},
+              { "Oak Leaes", "minecraft:leaves", 0},
+              { "Rune of Air", "botania:rune", 3},
+              { "Rune of Autumn", "botania:rune", 6},
+              { "Rune of Earth", "botania:rune", 2},
+              { "Rune of Fire", "botania:rune", 1},
+              { "Rune of Spring", "botania:rune", 4},
+              { "Rune of Summer", "botania:rune", 5},
+              { "Rune of Water", "botania:rune", 0},
+              { "Rune of Winter", "botania:rune",7},
+              { "Sand", "minecraft:sand", 0},
+              { "Sapling", "minecraft:sapling", 0},
+              { "Slimeball", "minecraft:slime_ball", 0},
+              { "Snow", "minecraft:snow", 0},
+              { "Spider Eye", "minecraft:spider_eye", 0},
+              { "Stone", "minecraft:stone", 0},
+              { "String", "minecraft:string", 0},
+              { "Sugar Canes", "minecraft:reeds", 0},
+              { "Wheat", "minecraft:wheat", 0 },
+              { "Wool", "minecraft:wool", 0}
+}
+
+recipeList = { Rune_of_Fire = { {"Manasteel Ingot",1}, {"Mana Powder",1}, {"Nether Wart",1}, {"Nether Brick",1},  {"Gunpowder",1} },
+               Rune_of_Air = { {"Manasteel Ingot",1}, {"Mana Powder",1}, {"Carpet",1}, {"String",1}, {"Feather",1} },
+               Rune_of_Water = { {"Manasteel Ingot",1}, {"Mana Powder",1}, {"Fishing Rod",1}, {"Sugar Canes",1}, {"Bone Meal",1} },
+               Rune_of_Earth = { {"Manasteel Ingot",1}, {"Mana Powder",1}, {"Block of Coal",1}, {"Stone",1}, {"Mushroom",1} },
+               Rune_of_Mana = { {"Manasteel Ingot",5}, {"Mana Pearl",1} },
+               Rune_of_Spring = { {"Rune of Fire",1}, {"Rune of Water",1}, {"Sapling",3}, {"Wheat",1} },
+               Rune_of_Summer = { {"Rune of Earth",1}, {"Rune of Air",1}, {"Sand",2}, {"Slimeball",1}, {"Melon",1} },
+               Rune_of_Autumn = { {"Rune of Fire",1}, {"Rune of Air",1}, {"Oak Leaves",3}, {"Spider Eye",1} },
+               Rune_of_Winter = { {"Rune of Water",1}, {"Rune of Earth",1}, {"Snow",2}, {"Wool",1}, {"Cake",1} },
+}
+     
+function validItem (name, damage)
+  for label,info in pairs(itemList) do
+    l = info[1]
+    n = info[2]
+    d = info[3]
+    if (name == n and damage == d) then
+       return true
+    end
+  end
+  return false 
+end
+       
+function findComponents()
+  local ts, pts, prs
+  for k,v in component.list("transposer") do
+    ts = k
+  end
+  pts = component.proxy(ts)
+  for k,v in component.list("redstone") do
+    ts = k
+  end
+  prs = component.proxy(ts)
+  return pts, prs
+end
+
+function findInventories(pts)
+  local retPhantomFace = -1
+  local retChest = -1
+  local size
+
+  for i = 0,5 do
+    size = pts.getInventorySize(i)
+    if (size == 1) then
+      retPhantomFace = i
+    elseif (size == 27) then
+      retChest = i
+    end
+  end
+
+  if retPhantomFace == -1 or retChest == -1 then
+    print("Could not find inventories")
+    os.exit()
+  end
+
+  return retPhantomFace, retChest
+end
+
+function readChest(pts,side)
+  counts = {}
+  locations = {}
+
+  term.clear()
+  print("Runic Altar Automation Program")
+  
+  for slot = 1,27 do
+    stackInfo = pts.getStackInSlot(side,slot)
+    if stackInfo then
+--      for k,v in pairs(stackInfo) do
+--        print("[" .. slot .. "] " .. k .. ": " .. tostring(v))
+--      end
+    local label = stackInfo["label"]
+    if (counts[label] ~= nil and counts[label] > 0) then
+       print("Combining stacks at " .. locations[label] .. " and " .. slot)
+       pts.transferItem(side,side,stackInfo["size"],slot,locations[label])
+       counts[label] = pts.getSlotStackSize(side,locations[label])
+    else
+        local label = stackInfo["label"]
+        counts[label] = stackInfo["size"]
+        locations[label] = slot  
+      end
+    end
+  end
+
+
+  checkRecipes()
+  os.sleep(5)
+end
+
+function checkRecipes() 
+  for k,v in pairs(recipeList) do
+    hasIngredients = 0
+    neededItems = 0
+    if (counts["Livingrock"] ~= nil and counts["Livingrock"] >= 0) then
+      for c,i in pairs(v) do
+        label = i[1]
+        qty = i[2]
+        neededItems = neededItems + 1
+        if (counts[label] ~= nil and counts[label] >= qty) then
+          if debug then
+            print("Found " .. qty .. "x " .. label .. " for " .. k)
+          end
+          hasIngredients = hasIngredients + 1
+        end
+      end
+      if (hasIngredients == neededItems) then
+        print("Found ingredients for " .. k)
+        craftRune(k)
+        return
+      end
+    end
+  end
+end
+
+function craftRune(rune)
+  prs.setBundledOutput(sides.front,colors.green,15)
+  print("Crafting " .. rune)
+  for k,i in pairs(recipeList[rune]) do
+     item = i[1]
+     qty = i[2]
+     slot = locations[item]
+     print("Adding " .. qty .. " of " .. item .. " from slot " .. slot)
+     pts.transferItem(C, PF, qty,slot,1)
+     os.sleep(0.2)
+  end
+  os.sleep(2)
+  
+  while (prs.getComparatorInput(sides.top) == 1) do
+    os.sleep(1)
+--    print("Waiting for crafting to complete")
+  end
+  if (prs.getComparatorInput(sides.top) == 2) then
+    pts.transferItem(C, PF, 1, locations["Livingrock"], 1)
+    os.sleep(0.5)
+    print("Triggering Wand of Forest")
+    prs.setBundledOutput(sides.front,colors.red,15)
+    os.sleep(0.5)
+    prs.setBundledOutput(sides.front,colors.red,0)
+  else
+    print("Error, received comparator signal of " .. prs.getComparatorInput(sides.top))
+    return
+  end
+  os.sleep(1)
+  prs.setBundledOutput(sides.front,colors.green,0)
+  locations = {}
+  counts = {}
+  os.sleep(5)
+  print("Crafting of " .. rune .. " completed.")
+end
+
+pts, prs = findComponents()
+PF,C = findInventories(pts)
+print("Found PhantomFace on " .. sides[PF] .. " side")
+print("Found chest on " .. sides[C] .. " side")
+while true do
+  readChest(pts,C)
+end
