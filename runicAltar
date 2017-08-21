@@ -25,6 +25,8 @@ locations = {}
 
 debug = false
 
+-- This list contains every item that the program should recognize.
+-- Format: label, block ID, damage value
 itemList  = { { "Block of Coal", "minecraft:coal_block", 0 },
               { "Bone Meal", "minecraft:dye", 15},
               { "Cake", "minecraft:cake", 0},
@@ -62,6 +64,7 @@ itemList  = { { "Block of Coal", "minecraft:coal_block", 0 },
               { "Wool", "minecraft:wool", 0}
 }
 
+-- This list contains valid recipes with their ingredient lists for the runic altar.
 recipeList = { Rune_of_Fire = { {"Manasteel Ingot",1}, {"Mana Powder",1}, {"Nether Wart",1}, {"Nether Brick",1},  {"Gunpowder",1} },
                Rune_of_Air = { {"Manasteel Ingot",1}, {"Mana Powder",1}, {"Carpet",1}, {"String",1}, {"Feather",1} },
                Rune_of_Water = { {"Manasteel Ingot",1}, {"Mana Powder",1}, {"Fishing Rod",1}, {"Sugar Canes",1}, {"Bone Meal",1} },
@@ -72,7 +75,7 @@ recipeList = { Rune_of_Fire = { {"Manasteel Ingot",1}, {"Mana Powder",1}, {"Neth
                Rune_of_Autumn = { {"Rune of Fire",1}, {"Rune of Air",1}, {"Oak Leaves",3}, {"Spider Eye",1} },
                Rune_of_Winter = { {"Rune of Water",1}, {"Rune of Earth",1}, {"Snow",2}, {"Wool",1}, {"Cake",1} },
 }
-     
+-- For a given item name and damage value, determine if it is a recognized item.     
 function validItem (name, damage)
   for label,info in pairs(itemList) do
     l = info[1]
@@ -84,7 +87,8 @@ function validItem (name, damage)
   end
   return false 
 end
-       
+
+-- Find the expected attached transposer and redstone i/o blocks and save their addresses.
 function findComponents()
   local ts, pts, prs
   for k,v in component.list("transposer") do
@@ -98,6 +102,7 @@ function findComponents()
   return pts, prs
 end
 
+-- Scan the attached transposer's sides to find the expected input chest and open crate.
 function findInventories(pts)
   local retPhantomFace = -1
   local retChest = -1
@@ -120,6 +125,10 @@ function findInventories(pts)
   return retPhantomFace, retChest
 end
 
+-- Read the contents of the input chest.  For each item found, store the item information including quantities.
+-- Also search for any instances where an item stack is spread across multiple inventory slots and consolidate
+-- them.
+-- This is the main loop of the program.
 function readChest(pts,side)
   counts = {}
   locations = {}
@@ -130,9 +139,6 @@ function readChest(pts,side)
   for slot = 1,27 do
     stackInfo = pts.getStackInSlot(side,slot)
     if stackInfo then
---      for k,v in pairs(stackInfo) do
---        print("[" .. slot .. "] " .. k .. ": " .. tostring(v))
---      end
     local label = stackInfo["label"]
     if (counts[label] ~= nil and counts[label] > 0) then
        print("Combining stacks at " .. locations[label] .. " and " .. slot)
@@ -151,6 +157,8 @@ function readChest(pts,side)
   os.sleep(5)
 end
 
+-- Compare the contents of the input chest to the valid recipes list.  If sufficient ingredients are found
+-- to craft a rune, begin crafting.
 function checkRecipes() 
   for k,v in pairs(recipeList) do
     hasIngredients = 0
@@ -176,6 +184,10 @@ function checkRecipes()
   end
 end
 
+-- Take the appropriate quanties of the required ingredients from the input chest and move them into the open crate.
+-- Then monitor the redstone comparator state of the runic altar.  Comparator state of 1 indicates the craft is in progress.
+-- Comparator state of 2 means the craft is waiting to be finalized.  Once the alter crafting is ready to be finalized,
+-- move a livingrock from the input chest to the open crate and activate the dispenser to use the Wand of the Forest.
 function craftRune(rune)
   prs.setBundledOutput(sides.front,colors.green,15)
   print("Crafting " .. rune)
@@ -212,6 +224,7 @@ function craftRune(rune)
   print("Crafting of " .. rune .. " completed.")
 end
 
+-- Call initialization functions and then drop into the main loop of the program.
 pts, prs = findComponents()
 PF,C = findInventories(pts)
 print("Found PhantomFace on " .. sides[PF] .. " side")
